@@ -25,20 +25,22 @@ def main():
         epilog="""
 Examples:
   # Auto-generate session files:
-  pty-wrap -- python3 quiz.py &
+  pty-wrap --no-cleanup -- python3 quiz.py &
   # Prints:
   #   output: /tmp/pty-wrap-abc123/output.txt
   #   input:  /tmp/pty-wrap-abc123/input.fifo
+  #   pid:    /tmp/pty-wrap-abc123/pid
+  
+  # Check pty-wrap is still running:
+  kill -0 $(cat /tmp/pty-wrap-abc123/pid) && echo "running"
   
   # Interact:
   cat /tmp/pty-wrap-abc123/output.txt
   echo "answer" > /tmp/pty-wrap-abc123/input.fifo
   cat /tmp/pty-wrap-abc123/output.txt
 
-  # If you need to read final output after program exits, use --no-cleanup:
-  pty-wrap --no-cleanup -- python3 quiz.py &
-  # ... interact ...
-  # Files persist in /tmp until manually deleted or system cleanup
+  # Use --no-cleanup to read final output after program exits.
+  # Without it, files are deleted immediately when wrapped program exits.
 
 Cleanup behavior:
   By default, session files are deleted immediately when the program exits.
@@ -112,9 +114,15 @@ How it works:
         # Create the FIFO
         os.mkfifo(input_fifo)
         
+        # Create PID file
+        pid_file = os.path.join(session_dir, "pid")
+        with open(pid_file, "w") as f:
+            f.write(str(os.getpid()))
+        
         # Print paths for the agent to use
         print(f"output: {output_file}", flush=True)
         print(f"input:  {input_fifo}", flush=True)
+        print(f"pid:    {pid_file}", flush=True)
         
         cleanup = not args.no_cleanup
     else:
