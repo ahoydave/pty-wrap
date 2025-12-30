@@ -14,12 +14,12 @@ Interactive programs require back-and-forth communication that's hard to automat
 `pty-wrap` runs programs in a PTY and provides simple subcommands for interaction:
 
 ```bash
-pty-wrap start -- python3 quiz.py   # Start, get session ID
-pty-wrap read <session>              # Read output (auto-cleans if exited)
-pty-wrap send <session> "answer"     # Send input (safe, with timeout)
-pty-wrap status <session>            # Check if running/exited
-pty-wrap stop <session>              # Force stop and clean up
-pty-wrap list                        # Show all sessions
+pty-wrap start -- python3 double_number.py   # Start, get session ID
+pty-wrap read <session>                      # Read output (auto-cleans if exited)
+pty-wrap send <session> "answer"             # Send input (safe, with timeout)
+pty-wrap status <session>                    # Check if running/exited
+pty-wrap stop <session>                      # Force stop and clean up
+pty-wrap list                                # Show all sessions
 ```
 
 Just install it and tell your favourite coding agent to use it - it should figure it out fine.
@@ -33,8 +33,8 @@ uv tool install git+https://github.com/ahoydave/pty-wrap
 ## Quick Start
 
 ```bash
-# Start an interactive program
-$ pty-wrap start -- python3 quiz.py
+# Start an interactive program like our example
+$ pty-wrap start -- python3 double_number.py
 session: abc12345
 
 # Read what it printed
