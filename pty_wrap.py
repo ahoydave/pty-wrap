@@ -4,10 +4,10 @@ pty-wrap: Run interactive programs with simple command-based I/O.
 
 Subcommands:
   start   Start a wrapped program, returns session ID
-  read    Read output from a session
+  read    Read output from a session (auto-cleans up if process exited)
   send    Send input to a session (safe, with timeout)
   status  Check if session is still running
-  stop    Stop a session and clean up
+  stop    Force stop a session and clean up
 """
 
 import argparse
@@ -39,17 +39,11 @@ Example flow:
   $ pty-wrap send abc12345 "84"
   ok
 
-  $ pty-wrap read abc12345
+  $ pty-wrap read abc12345       # auto-cleans up since process exited
   What is 42 doubled?
   84
   Correct!
   [pty-wrap: process exited]
-
-  $ pty-wrap status abc12345
-  exited
-
-  $ pty-wrap stop abc12345
-  stopped
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -63,6 +57,7 @@ Example flow:
     # read
     read_parser = subparsers.add_parser("read", help="Read output from a session")
     read_parser.add_argument("session", help="Session ID")
+    read_parser.add_argument("--keep", action="store_true", help="Don't auto-cleanup if process has exited")
     
     # send
     send_parser = subparsers.add_parser("send", help="Send input to a session")
@@ -150,12 +145,23 @@ def cmd_start(args):
 def cmd_read(args):
     session_dir = get_session_dir(args.session)
     output_file = os.path.join(session_dir, "output.txt")
+    pid_file = os.path.join(session_dir, "pid")
     
     if not os.path.exists(output_file):
         sys.exit(f"Error: Session '{args.session}' not found")
     
     with open(output_file) as f:
         print(f.read(), end="")
+    
+    # Auto-cleanup if process has exited (unless --keep)
+    if not args.keep:
+        try:
+            with open(pid_file) as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)  # Check if alive - if so, don't cleanup
+        except (FileNotFoundError, ProcessLookupError, ValueError):
+            # Process has exited, clean up
+            shutil.rmtree(session_dir, ignore_errors=True)
 
 
 def cmd_send(args):

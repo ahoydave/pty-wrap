@@ -15,10 +15,10 @@ Interactive programs require back-and-forth communication that's hard to automat
 
 ```bash
 pty-wrap start -- python3 quiz.py   # Start, get session ID
-pty-wrap read <session>              # Read output (never blocks)
+pty-wrap read <session>              # Read output (auto-cleans if exited)
 pty-wrap send <session> "answer"     # Send input (safe, with timeout)
 pty-wrap status <session>            # Check if running/exited
-pty-wrap stop <session>              # Clean up
+pty-wrap stop <session>              # Force stop and clean up
 pty-wrap list                        # Show all sessions
 ```
 
@@ -43,17 +43,13 @@ What is 42 doubled?
 $ pty-wrap send abc12345 "84"
 ok
 
-# Read the response
+# Read the response (auto-cleans up since process exited)
 $ pty-wrap read abc12345
 What is 42 doubled?
 84
 Correct!
 
 [pty-wrap: process exited]
-
-# Clean up
-$ pty-wrap stop abc12345
-stopped
 ```
 
 ## Why PTY Instead of Pipes?
