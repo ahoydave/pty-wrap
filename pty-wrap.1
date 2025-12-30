@@ -1,191 +1,115 @@
 .TH PTY-WRAP 1 "December 2025" "pty-wrap 0.1.0" "User Commands"
 .SH NAME
-pty-wrap \- PTY wrapper exposing interactive program I/O through files
+pty-wrap \- run interactive programs with simple command-based I/O
 .SH SYNOPSIS
-.B pty-wrap
-.B \-o
-.I OUTPUT_FILE
-.B \-i
-.I INPUT_FIFO
-.RB [ \-m
-.IR MARKER ]
-.B \-\-
+.B pty-wrap start
+.RB [ \-\- ]
 .I COMMAND
 .RI [ ARGS... ]
+.br
+.B pty-wrap read
+.I SESSION
+.br
+.B pty-wrap send
+.I SESSION
+.I INPUT
+.br
+.B pty-wrap status
+.I SESSION
+.br
+.B pty-wrap stop
+.I SESSION
+.br
+.B pty-wrap list
 .SH DESCRIPTION
 .B pty-wrap
-runs a command inside a pseudo-terminal (PTY) and exposes its I/O through
-files. This allows AI agents to interact with interactive programs across
-multiple command invocations.
-.PP
-Unlike pipes, a PTY provides full terminal emulation: input echo, line editing,
-signal characters (Ctrl+C), and programs that check isatty() will behave as if
-connected to a real terminal.
-.PP
-The key insight is that AI agents typically execute commands atomically \- they
-cannot interactively respond to prompts mid-execution. This tool bridges that
-gap by allowing the agent to:
-.IP 1. 3
-Start the program (runs in background)
-.IP 2. 3
-Read the output file to see what the program printed
-.IP 3. 3
-Decide what input to send
-.IP 4. 3
-Write to the input FIFO
-.IP 5. 3
-Repeat until the program exits
-.SH OPTIONS
+runs interactive programs inside a pseudo-terminal (PTY) and provides
+simple subcommands for reading output and sending input. This allows
+automation of programs that expect terminal interaction.
+.SH SUBCOMMANDS
 .TP
-.BI \-o\  FILE ,\ \-\-output\  FILE
-File to write program output to. Output is appended, so you can see the full
-session history. Required.
+.BI "start [--] " "COMMAND [ARGS...]"
+Start a new session running COMMAND. Prints the session ID.
+Use \-\- before COMMAND if it has flags.
 .TP
-.BI \-i\  FIFO ,\ \-\-input\  FIFO
-FIFO (named pipe) to read input from. Must be created beforehand with
-.BR mkfifo (1).
-Required.
+.BI "read " SESSION
+Read all output from the session. Never blocks. Can be called multiple
+times; output accumulates.
 .TP
-.BI \-m\  TEXT ,\ \-\-marker\  TEXT
-Marker text written to output file when the program exits.
-Default: "[pty-wrap: process exited]"
+.BI "send " "SESSION INPUT"
+Send INPUT to the session (newline added automatically). Includes safety
+checks: verifies process is running and uses timeout to prevent blocking.
+Prints "ok" on success.
 .TP
-.B \-\-no\-cleanup
-Don't delete session files when the program exits. Use this if you need to
-reliably read the final output after exit. Files in /tmp are cleaned by the
-system periodically anyway.
+.BI "status " SESSION
+Check session status. Prints "running", "exited", or "not_found".
 .TP
-.B \-\-
-Separator between pty-wrap options and the command to run. Recommended if
-the command has its own flags.
+.BI "stop " SESSION
+Stop the session (kills process if running) and clean up files.
+Prints "stopped".
+.TP
+.B list
+List all sessions with their status and command.
 .SH EXAMPLES
-.SS Basic Usage
 .PP
 Start an interactive Python script and interact with it:
 .PP
 .RS
 .nf
-# Start the program (auto-generates session files)
-# Use --no-cleanup to read final output after exit
-pty-wrap --no-cleanup -- python3 quiz.py &
-# Prints:
-#   output: /tmp/pty-wrap-abc123/output.txt
-#   input:  /tmp/pty-wrap-abc123/input.fifo
+# Start the program
+$ pty-wrap start -- python3 quiz.py
+session: abc12345
 
 # Read what it printed
-cat /tmp/pty-wrap-abc123/output.txt
+$ pty-wrap read abc12345
+What is 42 doubled?
 
-# Send input
-echo "my answer" > /tmp/pty-wrap-abc123/input.fifo
+# Send answer
+$ pty-wrap send abc12345 "84"
+ok
 
-# Check the response
-cat /tmp/pty-wrap-abc123/output.txt
+# Read response
+$ pty-wrap read abc12345
+What is 42 doubled?
+84
+Correct!
 
-# Clean up (or let /tmp auto-cleanup)
-rm -rf /tmp/pty-wrap-abc123
+[pty-wrap: process exited]
+
+# Check status
+$ pty-wrap status abc12345
+exited
+
+# Clean up
+$ pty-wrap stop abc12345
+stopped
 .fi
 .RE
-.SS Interactive Shell Session
-.PP
-Run a shell and execute commands interactively:
-.PP
-.RS
-.nf
-mkfifo /tmp/shell_in
-pty-wrap -o /tmp/shell_out.txt -i /tmp/shell_in -- /bin/bash &
-
-# Run a command
-echo "ls -la" > /tmp/shell_in
-cat /tmp/shell_out.txt
-
-# Run another command
-echo "pwd" > /tmp/shell_in
-cat /tmp/shell_out.txt
-
-# Exit the shell
-echo "exit" > /tmp/shell_in
-.fi
-.RE
-.SS Handling Password Prompts
-.PP
-Interact with programs that prompt for passwords (use with caution):
-.PP
-.RS
-.nf
-mkfifo /tmp/sudo_in
-pty-wrap -o /tmp/sudo_out.txt -i /tmp/sudo_in -- sudo -S whoami &
-
-# Wait for password prompt
-sleep 0.5
-cat /tmp/sudo_out.txt  # Should show "[sudo] password for user:"
-
-# Send password (be careful with this!)
-echo "mypassword" > /tmp/sudo_in
-cat /tmp/sudo_out.txt
-.fi
-.RE
-.SH HOW IT WORKS
-.B pty-wrap
-creates a pseudo-terminal pair (master/slave). The target program is forked
-with its stdin/stdout/stderr connected to the slave side of the PTY.
-.PP
-The parent process:
-.IP \(bu 2
-Reads from the PTY master and appends to the output file
-.IP \(bu 2
-Reads from the input FIFO and writes to the PTY master
-.IP \(bu 2
-Monitors the child process and exits when it terminates
-.PP
-Because the program is connected to a PTY (not a pipe), it behaves exactly as
-if a human were typing in a terminal. This includes:
-.IP \(bu 2
-Input echo (you see what you "type" in the output)
-.IP \(bu 2
-Programs detect isatty() as true
-.IP \(bu 2
-Colored output and cursor control work
-.IP \(bu 2
-Ctrl+C can be sent as \\x03 to interrupt
 .SH FILES
+Sessions are stored in
+.I /tmp/pty-wrap-sessions/<session-id>/
+with the following files:
 .TP
-.I OUTPUT_FILE
-Accumulates all program output. Append-only, so contains full session history.
+.I output.txt
+Accumulated program output.
 .TP
-.I INPUT_FIFO
-Named pipe for sending input. Auto-created when using auto-generation, or
-create manually with
-.BR mkfifo (1).
-.SH CLEANUP
-By default, when auto-generating session files, they are deleted immediately
-when the wrapped program exits. This means you may miss the final output if
-your polling isn't fast enough.
-.PP
-Use
-.B \-\-no\-cleanup
-if you need to reliably read output after the program exits. The files will
-remain in /tmp until you delete them or the system cleans /tmp (typically on
-reboot or via tmpwatch/systemd-tmpfiles).
-.PP
-When specifying your own paths with
-.B \-o
-and
-.BR \-i ,
-files are never automatically deleted.
+.I input.fifo
+Named pipe for sending input (managed by send subcommand).
+.TP
+.I pid
+Process ID of the pty-wrap daemon.
+.TP
+.I cmd
+The command being run.
 .SH EXIT STATUS
-.B pty-wrap
-exits when the child process exits. The exit marker is written to help agents
-detect completion.
+.TP
+.B 0
+Success
+.TP
+.B 1
+Error (session not found, process not running, timeout, etc.)
 .SH SEE ALSO
 .BR pty (7),
-.BR mkfifo (1),
 .BR expect (1)
-.SH NOTES
-This tool is designed for AI coding agents that need to interact with
-interactive programs but can only execute atomic commands. It provides
-a simple file-based interface that works with any shell scripting approach.
-.PP
-For security-sensitive operations (passwords, keys), be mindful that the output
-file contains the full session including any echoed sensitive input.
 .SH AUTHOR
-Written for AI agent development and experimentation.
+David Jacka
