@@ -128,8 +128,8 @@ def cmd_start(args):
     # Fork the wrapper process (double-fork to daemonize)
     pid = os.fork()
     if pid > 0:
-        # Parent: wait briefly for child to set up, then print session ID
-        time.sleep(0.2)
+        # Parent: wait for intermediate child to exit, then print session ID
+        os.waitpid(pid, 0)  # Reap the intermediate child (exits immediately)
         print(f"session: {session_id}")
         return
     
