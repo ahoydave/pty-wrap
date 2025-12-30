@@ -26,7 +26,7 @@ keywords = ["pty", "terminal", "interactive", "automation", "wrapper"]
 pty-wrap = "pty_wrap:main"
 
 [project.urls]
-Repository = "https://github.com/your-username/pty-wrap"
+Repository = "https://github.com/ahoydave/pty-wrap"
 
 [tool.setuptools]
 py-modules = ["pty_wrap"]

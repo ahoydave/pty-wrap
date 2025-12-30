@@ -27,7 +27,7 @@ This allows you to: read output → decide what to send → write input → repe
 ```bash
 uv tool install /path/to/pty-wrap
 # Or from git:
-uv tool install git+https://github.com/your-username/pty-wrap
+uv tool install git+https://github.com/ahoydave/pty-wrap
 ```
 
 **Alternative: pip**
