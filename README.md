@@ -22,6 +22,8 @@ pty-wrap stop <session>              # Force stop and clean up
 pty-wrap list                        # Show all sessions
 ```
 
+Just install it and tell your favourite coding agent to use it - it should figure it out fine.
+
 ## Installation
 
 ```bash
